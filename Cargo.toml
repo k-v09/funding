@@ -1,0 +1,9 @@
+[package]
+name = "fundamentals"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.13"
+rodio = "0.17"
+cpal = "0.15"
