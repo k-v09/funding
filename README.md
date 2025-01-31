@@ -14,7 +14,7 @@ Fundamentals is a real-time 3D audio visualization app built with Bevy. In time,
 
 ## Core Features
 - **Scene Setup:** Includes a 3D camera, lighting, a sphere (audio emitter), and a ground plane.
-- **Rotating Camera:** Moves around the scene for dynamic viewing.
+- **Rotating Camera:** Use the up and down arrow keys to zoom. Hold right click and drag the mouse to move the camera.
 - **Audio Visualization (Upcoming):** Plans to react to frequency and amplitude data.
 
 ## Code Breakdown
