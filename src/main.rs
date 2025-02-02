@@ -4,22 +4,44 @@ use bevy::input::mouse::MouseMotion;
 use bevy::input::keyboard::KeyCode;
 //use bevy::window::PrimaryWindow;
 
-fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
-        .insert_resource(CameraController {
-            sensitivity: 0.005,
-            zoom_speed: 0.5,
-        })
-        .add_systems(Startup, setup)
-        .add_systems(Update, (camera_controller, update_audio_visualization))
-        .run();
+#[derive(Component)]
+struct AudioEmitter {
+    frequency: f32, // in Hz
+    amplitude: f32,
+    phase: f32,
 }
-
+#[derive(Resource)]
+struct SimulationTime {
+    elapsed: f32,
+}
 #[derive(Resource)]
 struct CameraController {
     sensitivity: f32,
     zoom_speed: f32,
+}
+
+fn main() {
+    App::new()
+        .add_plugins(DefaultPlugins)
+        .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
+        .insert_resource(SimulationTime { elapsed: 0.0 })
+        .add_systems(Startup, setup)
+        .add_systems(Update, (camera_controller, update_sim))
+        .run();
+}
+
+fn update_sim(
+    time: Res<Time>,
+    mut sim_time: ResMut<SimulationTime>,
+    mut query: Query<(&mut Transform, &AudioEmitter)>,
+) {
+    sim_time.elapsed += time.delta_seconds();
+
+    for (mut transform, emitter) in query.iter_mut() {
+        let wave = ((emitter.frequency * sim_time.elapsed * std::f32::consts::TAU) + emitter.phase).sin();
+        let scale = 1.0 + wave * emitter.amplitude;
+        transform.scale = Vec3::splat(scale);
+    }
 }
 
 fn setup(
@@ -50,16 +72,37 @@ fn setup(
         ..default()
     });
 
-    // Audio emitter placeholder
-    commands.spawn(PbrBundle {
-        mesh: meshes.add(Sphere::new(0.5).mesh()),
-        material: materials.add(StandardMaterial {
-            base_color: Color::rgb(0.8, 0.2, 0.2),
-            ..default()
-        }),
-        transform: Transform::from_xyz(0.0, 0.5, 0.0),
-        ..default()
-    });
+    // Am chord
+    let emitter_configs = [
+        (440.0, Color:: RED, 0.0),       // 0
+        (523.25, Color::GREEN, 2.094), // 2pi/3
+        (660.0, Color::BLUE, 4.189),   // 4pi/3
+    ];
+
+    for (i, (frequency, color, phase)) in emitter_configs.iter().enumerate() {
+        let angle = (i as f32 / emitter_configs.len() as f32) * std::f32::consts::TAU;
+        let radius = 2.0;
+        let x = radius * angle.cos();
+        let z = radius * angle.sin();
+
+        commands.spawn((
+                PbrBundle {
+                    mesh: meshes.add(Sphere::new(0.5).mesh()),
+                    material: materials.add(StandardMaterial {
+                        base_color: *color,
+                        emissive: *color * 0.2,
+                        ..default()
+                    }),
+                    transform: Transform::from_xyz(x, 0.5, z),
+                    ..default()
+                },
+                AudioEmitter {
+                    frequency: *frequency,
+                    amplitude: 0.3, // scale range of 0.7 to 1.3
+                    phase: *phase,
+                },
+        ));
+    }
 
     commands.spawn(PbrBundle {
         mesh: meshes.add(Plane3d::default().mesh()),
@@ -125,6 +168,3 @@ fn rotate_camera(
     }
 }
 */
-fn update_audio_visualization() {
-    // TODO: Add audio processing and visualization updates
-}
