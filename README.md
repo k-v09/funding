@@ -64,11 +64,11 @@ The camera orbits the scene using:
 
 ## Roadmap
 ### Upcoming Features
-✅ **Basic 3D Scene** (Implemented)  
-🔲 **Audio Processing Integration** - Real-time frequency analysis using FFT (may or may not happen depending on what direction the project takes). 
-🔲 **Dynamic Object Transformations** - Emitters could deform or change color in response to audio.  
-🔲 **Multiple Audio Sources** - Support for diverse inputs beyond predefined frequencies.  
-🔲 **User Interaction Improvements** - Customizable controls and UI enhancements with time controls and "world building" tools
+- [x] **Basic 3D Scene** (Implemented)  
+- [] **Audio Processing Integration** - Real-time frequency analysis using FFT (may or may not happen depending on what direction the project takes). 
+- [] **Dynamic Object Transformations** - Emitters could deform or change color in response to audio.  
+- [] **Multiple Audio Sources** - Support for diverse inputs beyond predefined frequencies.  
+- [] **User Interaction Improvements** - Customizable controls and UI enhancements with time controls and "world building" tools
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.

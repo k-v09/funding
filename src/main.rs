@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use bevy::math::primitives::{Sphere, Plane3d};
 use bevy::input::mouse::MouseMotion;
 use bevy::input::keyboard::KeyCode;
+use bevy_egui::{egui, EguiContexts, EguiPlugin};
 //use bevy::window::PrimaryWindow;
 
 #[derive(Component)]
@@ -13,6 +14,7 @@ struct AudioEmitter {
 #[derive(Resource)]
 struct SimulationTime {
     elapsed: f32,
+    speed_multiplier: f32,
 }
 #[derive(Resource)]
 struct CameraController {
@@ -23,10 +25,11 @@ struct CameraController {
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
+        .add_plugins(EguiPlugin)
         .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
-        .insert_resource(SimulationTime { elapsed: 0.0 })
+        .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.1 })
         .add_systems(Startup, setup)
-        .add_systems(Update, (camera_controller, update_sim))
+        .add_systems(Update, (camera_controller, update_sim, control_system,))
         .run();
 }
 
@@ -35,13 +38,28 @@ fn update_sim(
     mut sim_time: ResMut<SimulationTime>,
     mut query: Query<(&mut Transform, &AudioEmitter)>,
 ) {
-    sim_time.elapsed += time.delta_seconds();
+    sim_time.elapsed += time.delta_seconds() * sim_time.speed_multiplier;
 
     for (mut transform, emitter) in query.iter_mut() {
         let wave = ((emitter.frequency * sim_time.elapsed * std::f32::consts::TAU) + emitter.phase).sin();
         let scale = 1.0 + wave * emitter.amplitude;
         transform.scale = Vec3::splat(scale);
     }
+}
+
+fn control_system(
+    mut contexts: EguiContexts,
+    mut sim_time: ResMut<SimulationTime>,
+) {
+    egui::Window::new("Simulation Controls")
+        .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(10.0, 10.0))
+        .default_width(200.0)
+        .show(contexts.ctx_mut(), |ui| {
+            ui.label("Simulation Speed");
+            ui.add(egui::Slider::new(&mut sim_time.speed_multiplier, 0.0..=1.0)
+                .text("Speed")
+                .suffix("x"));
+        });
 }
 
 fn setup(
@@ -74,7 +92,7 @@ fn setup(
 
     // Am chord
     let emitter_configs = [
-        (440.0, Color:: RED, 0.0),       // 0
+        (440.0, Color:: RED, 0.0),     // 0
         (523.25, Color::GREEN, 2.094), // 2pi/3
         (660.0, Color::BLUE, 4.189),   // 4pi/3
     ];
