@@ -2,7 +2,6 @@ use bevy::prelude::*;
 use bevy::math::primitives::{Sphere, Plane3d};
 use bevy::input::mouse::MouseMotion;
 use bevy::input::keyboard::KeyCode;
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
 //use bevy::window::PrimaryWindow;
 
 #[derive(Component)]
@@ -25,11 +24,10 @@ struct CameraController {
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(EguiPlugin)
         .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
         .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.1 })
         .add_systems(Startup, setup)
-        .add_systems(Update, (camera_controller, update_sim, control_system,))
+        .add_systems(Update, (camera_controller, update_sim,))
         .run();
 }
 
@@ -45,21 +43,6 @@ fn update_sim(
         let scale = 1.0 + wave * emitter.amplitude;
         transform.scale = Vec3::splat(scale);
     }
-}
-
-fn control_system(
-    mut contexts: EguiContexts,
-    mut sim_time: ResMut<SimulationTime>,
-) {
-    egui::Window::new("Simulation Controls")
-        .anchor(egui::Align2::LEFT_TOP, egui::Vec2::new(10.0, 10.0))
-        .default_width(200.0)
-        .show(contexts.ctx_mut(), |ui| {
-            ui.label("Simulation Speed");
-            ui.add(egui::Slider::new(&mut sim_time.speed_multiplier, 0.0..=1.0)
-                .text("Speed")
-                .suffix("x"));
-        });
 }
 
 fn setup(

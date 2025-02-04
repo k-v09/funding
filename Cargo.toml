@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-bevy = "0.12.1"
-bevy_egui = "0.24.0"
+bevy = "0.13.2"
 rodio = "0.17"
 cpal = "0.15"
