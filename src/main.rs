@@ -5,6 +5,8 @@ use bevy::input::keyboard::KeyCode;
 //use bevy::window::PrimaryWindow;
 
 #[derive(Component)]
+struct SpeedSlider;
+#[derive(Component)]
 struct AudioEmitter {
     frequency: f32, // in Hz
     amplitude: f32,
@@ -21,13 +23,83 @@ struct CameraController {
     zoom_speed: f32,
 }
 
+fn setup_ui(
+    mut commands: Commands,
+) {
+    commands.spawn(Camera2dBundle::default());
+    commands.spawn(NodeBundle {
+        style: Style {
+            width: Val::Percent(100.0),
+            height: Val::Px(100.0),
+            position_type: PositionType::Absolute,
+            bottom: Val::Px(20.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            ..default()
+        },
+        background_color: Color::rgba(0.2, 0.2, 0.2, 0.5).into(),
+        ..default()
+    })
+    .with_children(|parent| {
+        parent.spawn(TextBundle::from_section(
+            "Simulation Speed",
+            TextStyle {
+                font_size: 20.0,
+                color: Color::WHITE,
+                ..default()
+            }
+        ));
+        parent.spawn((
+            ButtonBundle {
+                style: Style {
+                    width: Val::Px(200.0),
+                    height: Val::Px(30.0),
+                    ..default()
+                },
+                background_color: Color::GRAY.into(),
+                ..default()
+            },
+            SpeedSlider
+        ));
+    });
+}
+
+fn ssi(
+    mut interaction_query: Query<
+        (&Interaction, &mut BackgroundColor), 
+        (Changed<Interaction>, With<SpeedSlider>)
+    >,
+    mut sim_time: ResMut<SimulationTime>,
+    keyboard: Res<ButtonInput<KeyCode>>
+) {
+    for (interaction, mut color) in interaction_query.iter_mut() {
+        match interaction {
+            Interaction::Pressed => {
+                if keyboard.pressed(KeyCode::ArrowRight) {
+                    sim_time.speed_multiplier = (sim_time.speed_multiplier + 0.01).min(1.0);
+                }
+                if keyboard.pressed(KeyCode::ArrowLeft) {
+                    sim_time.speed_multiplier = (sim_time.speed_multiplier - 0.01).max(0.0);
+                }
+                *color = Color::BLUE.into();
+            }
+            Interaction::Hovered => {
+                *color = Color::DARK_GRAY.into();
+            }
+            Interaction::None => {
+                *color = Color::GRAY.into();
+            }
+        }
+    }
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
-        .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.1 })
-        .add_systems(Startup, setup)
-        .add_systems(Update, (camera_controller, update_sim,))
+        .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.01 })
+        .add_systems(Startup, (setup, setup_ui,))
+        .add_systems(Update, (camera_controller, update_sim, ssi,))
         .run();
 }
 
