@@ -7,6 +7,7 @@ Fundamentals is a real-time 3D audio visualization app built using [Bevy](https:
 ### Prerequisites
 - Ensure you have Rust installed.
 - Ensure you're prepared to have your mind absolutely blown
+- Please be sure you're using bevy 0.13+ I learned that the hard way
 
 ### Installation & Running the App
 ```sh
@@ -65,10 +66,10 @@ The camera orbits the scene using:
 ## Roadmap
 ### Upcoming Features
 - [x] **Basic 3D Scene** (Implemented)  
-- [] **Audio Processing Integration** - Real-time frequency analysis using FFT (may or may not happen depending on what direction the project takes). 
-- [] **Dynamic Object Transformations** - Emitters could deform or change color in response to audio.  
-- [] **Multiple Audio Sources** - Support for diverse inputs beyond predefined frequencies.  
-- [] **User Interaction Improvements** - Customizable controls and UI enhancements with time controls and "world building" tools
+- [ ] **Audio Processing Integration** - Real-time frequency analysis using FFT (may or may not happen depending on what direction the project takes). 
+- [ ] **Dynamic Object Transformations** - Emitters could deform or change color in response to audio.  
+- [ ] **Multiple Audio Sources** - Support for diverse inputs beyond predefined frequencies.  
+- [ ] **User Interaction Improvements** - Customizable controls and UI enhancements with time controls and "world building" tools
 
 ## Contributing
 Contributions are welcome! Feel free to submit issues or pull requests.
