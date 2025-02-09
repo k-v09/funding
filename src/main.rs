@@ -1,9 +1,16 @@
 use bevy::prelude::*;
-use bevy::math::primitives::{Sphere, Plane3d};
+//use bevy::math::primitives::{Sphere, Plane3d};
 use bevy::input::mouse::MouseMotion;
 use bevy::input::keyboard::KeyCode;
 use bevy::ui::Interaction;
+/*
+use bevy::render::render_resource::*;
+use bevy::asset::Handle;
+use bevy::render::renderer::{RenderDevice, RenderQueue};
+use wgpu::{Device, Queue, CommandEncoder};
+//use bevy::render::render_resource::{ShaderStages, Shader, ShaderType};
 //use bevy::window::PrimaryWindow;
+*/
 
 #[derive(Component)]
 struct SpeedDisplay;
@@ -21,6 +28,12 @@ struct AudioEmitter {
     amplitude: f32,
     phase: f32,
 }
+#[derive (Component)]
+struct CameraOrbit {
+    radius: f32,
+    pitch: f32,
+    yaw: f32,
+}
 #[derive(Resource)]
 struct SimulationTime {
     elapsed: f32,
@@ -31,6 +44,17 @@ struct CameraController {
     sensitivity: f32,
     zoom_speed: f32,
 }
+/*
+#[derive(Resource)]
+struct ComputePipeline {
+    pipeline: CachedComputePipelineId,
+    bind_group: BindGroup,
+    buffer: Buffer,
+}
+#[derive(Resource)]
+struct WaveMaterial {
+    shader: Handle<Shader>,
+}*/
 
 fn setup_ui(
     mut commands: Commands,
@@ -208,8 +232,12 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
         .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.01 })
-        .add_systems(Startup, (setup, setup_ui,))
+        .add_systems(Startup, (
+                setup,
+                setup_ui,
+            ))
         .add_systems(Update, (
+//                run_shader,
                 camera_controller,
                 update_sim,
                 ssi,
@@ -237,6 +265,7 @@ fn update_sim(
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+//    mut shaders: ResMut<Assets<Shader>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     commands.spawn((
@@ -303,13 +332,6 @@ fn setup(
     });
 }
 
-#[derive(Component)]
-struct CameraOrbit {
-    radius: f32,
-    pitch: f32,
-    yaw: f32,
-}
-
 fn camera_controller(
     mut mouse_motion: EventReader<MouseMotion>,
     keyboard: Res<ButtonInput<KeyCode>>,
@@ -345,6 +367,75 @@ fn camera_controller(
 }
 
 /*
+fn setup(
+    mut commands: Commands,
+    mut pipeline_cache: ResMut<PipelineCache>,
+    mut shaders: ResMut<Assets<Shader>>,
+    render_device: Res<RenderDevice>,
+    render_queue: Res<RenderQueue>,
+) {
+    let shader_handle = shaders.add(Shader::from_wgsl(include_str!("./shaders/wave-shader.wgsl")));
+    
+    let buffer = render_device.create_buffer(&BufferDescriptor {
+        label: Some("Compute Amplitude Buffer"),
+        size: (std::mem::size_of::<f32>() * 64) as u64,
+        usage: BufferUsages::STORAGE | BufferUsages::COPY_DST | BufferUsages::COPY_SRC,
+        mapped_at_creation: false,
+    });
+
+    let bind_group_layout = render_device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+        label: Some("Compute Bind Group Layout"),
+        entries: &[BindGroupLayoutEntry {
+            binding: 0,
+            visibility: ShaderStages::COMPUTE,
+            ty: BindingType::Buffer {
+                ty: BufferBindingType::Storage { read_only: false },
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    });
+
+    let bind_group = render_device.create_bind_group(&BindGroupDescriptor {
+        label: Some("Compute Bind Group"),
+        layout: &bind_group_layout,
+        entries: &[BindGroupEntry {
+            binding: 0,
+            resource: buffer.as_entire_binding(),
+        }],
+    });
+
+    let pipeline_layout = render_device.create_pipeline_layout(&PipelineLayoutDescriptor {
+        label: Some("Compute Pipeline Layout"),
+        bind_group_layouts: &[&bind_group_layout],
+        push_constant_ranges: &[],
+    });
+
+    let pipeline = pipeline_cache.create_compute_pipeline(ComputePipelineDescriptor {
+        label: Some("Compute Pipeline"),
+        layout: Some(pipeline_layout),
+        shader: shader_handle,
+        shader_defs: vec![],
+        entry_point: "main".into(),
+    });
+
+    commands.insert_resource(ComputePipeline { pipeline, bind_group, buffer });
+}
+
+fn run_shader(
+    pipeline_cache: Res<PipelineCache>,
+    pipeline: Res<ComputePipeline>,
+    mut encoder: ResMut<CommandEncoder>,
+) {
+    if let Some(pipeline) = pipeline_cache.get_compute_pipeline(pipeline.pipeline) {
+        let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor::default());
+        pass.set_pipeline(pipeline);
+        pass.set_bind_group(0, &pipeline.bind_group, &[]);
+        pass.dispatch_workgroups(1,1,1);
+    }
+}
+
 fn rotate_camera(
     time: Res<Time>,
     mut query: Query<&mut Transform, With<Camera>>,
