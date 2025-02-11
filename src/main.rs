@@ -34,6 +34,11 @@ struct CameraOrbit {
     pitch: f32,
     yaw: f32,
 }
+#[derive(Component)]
+struct ControlSection {
+    section_type: SectionType,
+    is_active: bool,
+}
 #[derive(Resource)]
 struct SimulationTime {
     elapsed: f32,
@@ -43,6 +48,10 @@ struct SimulationTime {
 struct CameraController {
     sensitivity: f32,
     zoom_speed: f32,
+}
+#[derive(PartialEq)]
+enum SectionType {
+    Speed,
 }
 /*
 #[derive(Resource)]
@@ -64,7 +73,7 @@ fn setup_ui(
         NodeBundle {
             style: Style {
                 width: Val::Px(200.0),
-                height: Val::Percent(100.0),
+                height: Val::Percent(90.0),
                 position_type: PositionType::Absolute,
                 left: Val::Px(20.0),
                 top: Val::Px(20.0),
@@ -106,9 +115,9 @@ fn setup_ui(
         parent.spawn((
             NodeBundle {
                 style: Style {
-                    padding: UiRect::all(Val::Px(10.0)),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
+                    width: Val::Percent(100.0),
+                    padding: UiRect::horizontal(Val::Px(10.0)),
+                    flex_direction: FlexDirection::Column,
                     ..default()
                 },
                 ..default()
@@ -116,27 +125,34 @@ fn setup_ui(
             ContentContainer,
         ))
         .with_children(|parent| {
-            parent.spawn(TextBundle::from_section(
-                "Speed: ",
-                TextStyle {
-                    font_size: 20.0,
-                    color: Color::WHITE,
-                    ..default()
-                }
-            ));
             parent.spawn((
-                NodeBundle {
+                ButtonBundle {
                     style: Style {
-                        padding: UiRect::all(Val::Px(8.0)),
-                        margin: UiRect::left(Val::Px(10.0)),
+                        width: Val::Percent(100.0),
+                        padding: UiRect::all(Val::Px(10.0)),
+                        margin: UiRect::bottom(Val::Px(10.0)),
+                        justify_content: JustifyContent::SpaceBetween,
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                     background_color: Color::GRAY.into(),
                     ..default()
                 },
+                ControlSection {
+                    section_type: SectionType::Speed,
+                    is_active: false,
+                },
                 SpeedDisplay,
             ))
             .with_children(|parent| {
+                parent.spawn(TextBundle::from_section(
+                    "Speed",
+                    TextStyle {
+                        font_size: 20.0,
+                        color: Color::WHITE,
+                        ..default()
+                    }
+                ));
                 parent.spawn(TextBundle::from_section(
                     "0.01",
                     TextStyle {
@@ -148,6 +164,27 @@ fn setup_ui(
             });
         });
     });
+}
+
+fn hsa(
+    mut interaction_query: Query<
+        (&Interaction, &mut ControlSection, &mut BackgroundColor),
+        (Changed<Interaction>, With<SpeedDisplay>)
+    >,
+) {
+    for (interaction, mut section, mut bg_color) in interaction_query.iter_mut() {
+        match *interaction {
+            Interaction::Pressed => {
+                section.is_active = !section.is_active;
+                *bg_color = if section.is_active {
+                    Color::rgb(0.3, 0.4, 0.6).into()
+                } else {
+                    Color::GRAY.into()
+                };
+            }
+            _=> {}
+        }
+    }
 }
 
 fn update_collapse(
@@ -173,10 +210,15 @@ fn update_collapse(
 }
 
 fn content_visibility(
-    panel_query: Query<&UiPanel>,
+    mut panel_query: Query<(&UiPanel, &mut Style)>,
     mut content_query: Query<&mut Visibility, With<ContentContainer>>,
 ) {
-    let panel = panel_query.single();
+    let (panel, mut style) = panel_query.single_mut();
+    style.height = if panel.collapsed {
+        Val::Px(40.0)
+    } else {
+        Val::Percent(90.0)
+    };
     for mut visibility in content_query.iter_mut() {
         *visibility = if panel.collapsed {
             Visibility::Hidden
@@ -189,23 +231,27 @@ fn content_visibility(
 fn usd(
     sim_time: Res<SimulationTime>,
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<(&mut BackgroundColor, &Children), With<SpeedDisplay>>,
+    mut section_query: Query<(&ControlSection, &Children, &mut BackgroundColor), With<SpeedDisplay>>,
     mut text_query: Query<&mut Text>,
     panel_query: Query<&UiPanel>,
 ) {
     let is_collapsed = panel_query.single().collapsed;
-    let is_active = !is_collapsed && (keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::ArrowRight));
-    if let Ok((mut background_color, children)) = query.get_single_mut() {
-        *background_color = if is_active {
+    let (section, children, mut bg_color) = section_query.single_mut();
+    let is_active = !is_collapsed && section.is_active && (keyboard.pressed(KeyCode::ArrowLeft) || keyboard.pressed(KeyCode::ArrowRight));
+
+    *bg_color = if section.is_active {
+        if is_active {
             Color::rgb(0.4, 0.6, 0.8).into()
         } else {
-            Color::GRAY.into()
-        };
+            Color::rgb(0.3, 0.4, 0.6).into()
+        }
+    } else {
+        Color::GRAY.into()
+    };
 
-        for &child in children {
-            if let Ok(mut text) = text_query.get_mut(child) {
-                text.sections[0].value = format!("{:.3}", sim_time.speed_multiplier);
-            }
+    if let Some(&last_child) = children.last() {
+        if let Ok(mut text) = text_query.get_mut(last_child) {
+            text.sections[0].value = format!("{:.3}", sim_time.speed_multiplier);
         }
     }
 }
@@ -214,9 +260,12 @@ fn ssi(
     mut sim_time: ResMut<SimulationTime>,
     keyboard: Res<ButtonInput<KeyCode>>,
     panel_query: Query<&UiPanel>,
+    section_query: Query<&ControlSection, With<SpeedDisplay>>,
 ) {
     let is_collapsed = panel_query.single().collapsed;
     if is_collapsed { return }
+    let speed_section = section_query.single();
+    if !speed_section.is_active { return }
 
     let speed_delta = 0.001;
     if keyboard.pressed(KeyCode::ArrowRight) {
@@ -240,6 +289,7 @@ fn main() {
 //                run_shader,
                 camera_controller,
                 update_sim,
+                hsa,
                 ssi,
                 usd,
                 update_collapse,
