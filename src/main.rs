@@ -1,8 +1,14 @@
-use bevy::prelude::*;
-//use bevy::math::primitives::{Sphere, Plane3d};
-use bevy::input::mouse::MouseMotion;
-use bevy::input::keyboard::KeyCode;
-use bevy::ui::Interaction;
+use bevy::{
+    prelude::*,
+    input::{mouse::MouseMotion, keyboard::KeyCode},
+    math::DVec3,
+};
+mod extras {
+    pub mod components;
+    pub mod resources;
+}
+use extras::components::*;
+use extras::resources::*;
 /*
 use bevy::render::render_resource::*;
 use bevy::asset::Handle;
@@ -11,59 +17,6 @@ use wgpu::{Device, Queue, CommandEncoder};
 //use bevy::render::render_resource::{ShaderStages, Shader, ShaderType};
 //use bevy::window::PrimaryWindow;
 */
-
-#[derive(Component)]
-struct SpeedDisplay;
-#[derive(Component)]
-struct UiPanel {
-    collapsed: bool,
-}
-#[derive(Component)]
-struct Collapse;
-#[derive(Component)]
-struct ContentContainer;
-#[derive(Component)]
-struct AudioEmitter {
-    frequency: f32, // in Hz
-    amplitude: f32,
-    phase: f32,
-}
-#[derive (Component)]
-struct CameraOrbit {
-    radius: f32,
-    pitch: f32,
-    yaw: f32,
-}
-#[derive(Component)]
-struct ControlSection {
-    section_type: SectionType,
-    is_active: bool,
-}
-#[derive(Resource)]
-struct SimulationTime {
-    elapsed: f32,
-    speed_multiplier: f32,
-}
-#[derive(Resource)]
-struct CameraController {
-    sensitivity: f32,
-    zoom_speed: f32,
-}
-#[derive(PartialEq)]
-enum SectionType {
-    Speed,
-}
-/*
-#[derive(Resource)]
-struct ComputePipeline {
-    pipeline: CachedComputePipelineId,
-    bind_group: BindGroup,
-    buffer: Buffer,
-}
-#[derive(Resource)]
-struct WaveMaterial {
-    shader: Handle<Shader>,
-}*/
 
 fn setup_ui(
     mut commands: Commands,
@@ -171,7 +124,9 @@ fn hsa(
         (&Interaction, &mut ControlSection, &mut BackgroundColor),
         (Changed<Interaction>, With<SpeedDisplay>)
     >,
+    selection_state: Res<SelectionState>,
 ) {
+    if selection_state.selected_entity.is_some() { return }
     for (interaction, mut section, mut bg_color) in interaction_query.iter_mut() {
         match *interaction {
             Interaction::Pressed => {
@@ -261,7 +216,9 @@ fn ssi(
     keyboard: Res<ButtonInput<KeyCode>>,
     panel_query: Query<&UiPanel>,
     section_query: Query<&ControlSection, With<SpeedDisplay>>,
+    selection_state: Res<SelectionState>,
 ) {
+    if selection_state.selected_entity.is_some() { return }
     let is_collapsed = panel_query.single().collapsed;
     if is_collapsed { return }
     let speed_section = section_query.single();
@@ -281,6 +238,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .insert_resource(CameraController { sensitivity: 0.005, zoom_speed: 0.5, })
         .insert_resource(SimulationTime { elapsed: 0.0, speed_multiplier: 0.01 })
+        .insert_resource(SelectionState { selected_entity: None })
         .add_systems(Startup, (
                 setup,
                 setup_ui,
@@ -289,6 +247,7 @@ fn main() {
 //                run_shader,
                 camera_controller,
                 update_sim,
+                object_selection,
                 hsa,
                 ssi,
                 usd,
@@ -369,6 +328,7 @@ fn setup(
                     amplitude: 0.3, // scale range of 0.7 to 1.3
                     phase: *phase,
                 },
+                Selectable,
         ));
     }
 
@@ -381,6 +341,61 @@ fn setup(
         ..default()
     });
 }
+
+fn object_selection(
+    _commands: Commands,
+    camera_query: Query<(&Camera, &GlobalTransform)>,
+    window_query: Query<&Window>,
+    mouse_button: Res<ButtonInput<MouseButton>>,
+    mut selection_state: ResMut<SelectionState>,
+    selectable_query: Query<(Entity, &GlobalTransform), With<Selectable>>,
+) {
+    if !mouse_button.just_pressed(MouseButton::Left) { return }
+    let (camera, camera_transform) = camera_query.single();
+    let window = window_query.single();
+
+    if let Some(cursor_position) = window.cursor_position() {
+        if let Some(ray) = camera.viewport_to_world(camera_transform, cursor_position) {
+            let mut closest_hit: Option<(Entity, f32)> = None;
+            for (entity, transform) in selectable_query.iter() {
+                let sphere_center = transform.translation();
+                let sphere_radius = 0.5; // gotta double check sphere size
+
+                // Intersection check
+                let sphere_center_d: DVec3 = DVec3::new(
+                    sphere_center.x as f64,
+                    sphere_center.y as f64,
+                    sphere_center.z as f64,
+                );
+                let ray_origin_d = DVec3::new(
+                    ray.origin.x as f64,
+                    ray.origin.y as f64,
+                    ray.origin.z as f64,
+                );
+                let offset_d = ray_origin_d - sphere_center_d;
+                let dir_vec = ray.direction.as_dvec3();
+                let a = dir_vec.dot(dir_vec);
+                let b = 2.0 * dir_vec.dot(offset_d);
+                let c = offset_d.dot(offset_d) - (sphere_radius * sphere_radius) as f64;
+                let discr = b * b - 4.0 * a * c;
+                if discr >= 0.0 {
+                    let distance = ((-b - discr.sqrt()) / (2.0 * a)) as f32;
+                    if distance >= 0.0 {
+                        match closest_hit {
+                            None => closest_hit = Some((entity, distance)),
+                            Some((_, best_dist)) if distance < best_dist => {
+                                closest_hit = Some((entity, distance))
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            selection_state.selected_entity = closest_hit.map(|(entity, _)| entity);
+        }
+    }
+}
+
 
 fn camera_controller(
     mut mouse_motion: EventReader<MouseMotion>,
